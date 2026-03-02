@@ -1,4 +1,0 @@
-Installation
-============
-
-Install the environment...
