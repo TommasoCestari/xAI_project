@@ -24,24 +24,24 @@ def get_dataloader(config):
     -------
     Corresponding dataloader.
     """
-    if config.dataloader.lower() == 'mnist':
-        return load_mnist(**config.__dict__)
+    if config.dataloader.lower() == 'fashion_mnist':
+        return load_fashion_mnist(**config.__dict__)
     elif config.dataloader.lower() == 'compas':
         return load_compas(**config.__dict__)
 
 
-def load_mnist(data_path, batch_size, num_workers=0, valid_size=0.1, **kwargs):
+def load_fashion_mnist(data_path, batch_size, num_workers=0, valid_size=0.1, **kwargs):
     """
-    Load mnist data.
+    Load FashionMNIST data.
 
-    Loads mnist dataset and performs the following preprocessing operations:
+    Loads FashionMNIST dataset and performs the following preprocessing operations:
         - converting to tensor
-        - standard mnist normalization so that values are in (0, 1)
+        - standard FashionMNIST normalization so that values are in (0, 1)
 
     Parameters
     ----------
     data_path: str
-        Location of mnist data.
+        Location of FashionMNIST data.
     batch_size: int
         Batch size.
     num_workers: int
@@ -60,11 +60,11 @@ def load_mnist(data_path, batch_size, num_workers=0, valid_size=0.1, **kwargs):
     """
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
+        transforms.Normalize((0.2860,), (0.3530,))
     ])
 
-    train_set = datasets.MNIST(data_path, train=True, download=True, transform=transform)
-    test_set = datasets.MNIST(data_path, train=False, download=True, transform=transform)
+    train_set = datasets.FashionMNIST(data_path, train=True, download=True, transform=transform)
+    test_set = datasets.FashionMNIST(data_path, train=False, download=True, transform=transform)
 
     train_size = len(train_set)
     split = int(np.floor(valid_size * train_size))
