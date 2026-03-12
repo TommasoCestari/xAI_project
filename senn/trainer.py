@@ -655,25 +655,22 @@ class DiSENN_Trainer(SENN_Trainer):
             print("Saving model ...")
             self.save_checkpoint()
 
-    def visualize(self, save_dir, num=3):
-        """Generates some plots to visualize the explanations.
-
-        Parameters
-        ----------
-        save_dir : str
-            A placeholder to work with the Base Trainer class which calls visualize.
-            Needs refactoring.
-        num: int
-            Number of examples
-        """
-        self.model.eval()
-
-        # select test example
-        (test_batch, _) = next(iter(self.test_loader))
-        for i in range(num):
-            file_path = Path("results")
-            file_name = file_path / self.config.exp_name / "explanations.png"
-            x = test_batch[i].float().to(self.config.device)
+    def visualize(self, file_name="dummy.png"):
+        """Visualizes model explanations"""
+        (test_batch, test_labels) = next(iter(self.test_loader))
+        
+        file_path = Path("results")
+        file_name = file_path / self.config.exp_name / file_name
+        x = test_batch[0].float().to(self.config.device)
+        
+        # Check if it's DiSENN (has vae_conceptizer)
+        if hasattr(self.model, 'vae_conceptizer'):
+            y_pred, _, _ = self.model(x.unsqueeze(0))
+            # Use a different class for contrast
+            pred_class = y_pred.argmax().item()
+            contrast_class = (pred_class + 1) % self.config.num_classes
+            self.model.explain(x, contrast_class=contrast_class, save_as=file_name)
+        else:  # Regular SENN
             self.model.explain(x, save_as=file_name)
 
     def print_n_save_metrics(self, filename, total_loss,
