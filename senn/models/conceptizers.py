@@ -84,7 +84,7 @@ class IdentityConceptizer(Conceptizer):
         concepts : torch.Tensor
             Unchanged input features but with extra dimension (BATCH, INPUT_FEATURES, 1).
         """
-        return x.unsqueeze(-1)
+        return x.view(x.size(0), -1).unsqueeze(-1)
 
     def decode(self, z):
         """Decoder of Identity Conceptizer.
