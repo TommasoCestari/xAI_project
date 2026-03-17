@@ -26,7 +26,6 @@ import torch.nn as nn
 from senn.trainer import SENN_Trainer
 from captum.attr import Lime
 from captum._utils.models.linear_model import SkLearnLinearRegression
-from skimage.segmentation import slic
 
 
 # FashionMNIST normalisation constants
@@ -60,26 +59,20 @@ class SENNWrapper(nn.Module):
     def __init__(self, senn_model):
         super().__init__()
         self.senn = senn_model
-
+    #from senn output (y_pred, (concepts, relevances), x_reconstructed), we want only the predictions
     def forward(self, x):
         predictions, _, _ = self.senn(x)
         return predictions
 
 
-def slic_segmentation(image_tensor):
-    """SLIC superpixel segmentation for a single image tensor (C, H, W)."""
-    img_np = image_tensor.squeeze().cpu().numpy()
-    img_np = img_np * FMNIST_STD + FMNIST_MEAN
-    img_np = np.clip(img_np, 0, 1)
-    
-    
-    return slic(img_np, n_segments=30, compactness=10, sigma=1, start_label=0, channel_axis=None)
-
-
 def pixel_ablation_confidence_drop(wrapper, images, attributions, pred_labels,
                                    top_fraction=0.20):
-    """Mask top-k% pixels (by |attribution|) with dataset mean; return per-sample confidence drop."""
-    fill_value = 0.0  # dataset mean in normalised space
+    """Mask top-k% pixels (by |attribution|) with the background value; return per-sample confidence drop."""
+    
+    # Valore del pixel nero (0.0 originale) dopo la normalizzazione: (0.0 - 0.2860) / 0.3530
+    fill_value = -0.8102 
+    # (fill_value = 0.0 per usare la media del dataset)
+
     wrapper.eval()
     with torch.no_grad():
         probs_orig = torch.softmax(wrapper(images), dim=1)
@@ -91,7 +84,7 @@ def pixel_ablation_confidence_drop(wrapper, images, attributions, pred_labels,
             k = int(top_fraction * len(attr_flat))
             topk_idx = attr_flat.topk(k).indices
             img_flat = images_abl[i].view(images.shape[1], -1)
-            img_flat[:, topk_idx] = fill_value
+            img_flat[:, topk_idx] = fill_value # Applica il nero/sfondo
 
         probs_abl = torch.softmax(wrapper(images_abl), dim=1)
         conf_abl = probs_abl[torch.arange(len(pred_labels)), pred_labels]
@@ -104,9 +97,9 @@ def pixel_ablation_confidence_drop(wrapper, images, attributions, pred_labels,
 def main():
     parser = argparse.ArgumentParser(description="Run LIME on a SENN model")
     parser.add_argument("--config", required=True, help="Path to SENN config JSON")
-    parser.add_argument("--n_samples", type=int, default=500,
+    parser.add_argument("--n_samples", type=int, default=2000,
                         help="Number of LIME perturbation samples per image")
-    parser.add_argument("--max_images", type=int, default=0,
+    parser.add_argument("--max_images", type=int, default=500,
                         help="Max test images to process (0 = all)")
     parser.add_argument("--device", default="", help="Device (auto-detect if empty)")
     args = parser.parse_args()
@@ -144,23 +137,21 @@ def main():
         with torch.no_grad():
             preds = model(x)[0].argmax(1)
 
-        # LIME is per-image (needs individual segmentation masks)
+        # LIME is per-image
         batch_attrs = []
         t0 = time.perf_counter()
         for i in range(len(x)):
             img = x[i].unsqueeze(0)
-            seg = torch.tensor(slic_segmentation(x[i])).unsqueeze(0).to(device)
+            
             attr = lime_method.attribute(
                 img,
                 target=preds[i].item(),
-                feature_mask=seg,
                 n_samples=args.n_samples,
                 show_progress=False,
             )
             batch_attrs.append(attr.squeeze(0))
         batch_attrs = torch.stack(batch_attrs)
         t_total += time.perf_counter() - t0
-
         drops = pixel_ablation_confidence_drop(wrapper, x, batch_attrs, preds)
 
         all_attrs.append(batch_attrs.cpu())
@@ -192,7 +183,6 @@ def main():
         "config": args.config,
         "exp_name": exp_name,
         "n_lime_samples": args.n_samples,
-        "n_slic_segments": 30,
         "n_samples": int(len(all_labels)),
         "total_time_s": round(t_total, 3),
         "time_per_sample_s": round(t_total / len(all_labels), 5),

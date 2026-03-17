@@ -61,8 +61,11 @@ class SENNWrapper(nn.Module):
 
 def pixel_ablation_confidence_drop(wrapper, images, attributions, pred_labels,
                                    top_fraction=0.20):
-    """Mask top-k% pixels (by |attribution|) with dataset mean; return per-sample confidence drop."""
-    fill_value = 0.0  # dataset mean in normalised space for FashionMNIST
+    """Mask top-k% pixels (by |attribution|) with the background value; return per-sample confidence drop."""
+    
+    # Valore corretto del nero (sfondo) dopo la normalizzazione di FashionMNIST
+    fill_value = -0.8102 
+    
     wrapper.eval()
     with torch.no_grad():
         probs_orig = torch.softmax(wrapper(images), dim=1)
@@ -74,7 +77,7 @@ def pixel_ablation_confidence_drop(wrapper, images, attributions, pred_labels,
             k = int(top_fraction * len(attr_flat))
             topk_idx = attr_flat.topk(k).indices
             img_flat = images_abl[i].view(images.shape[1], -1)
-            img_flat[:, topk_idx] = fill_value
+            img_flat[:, topk_idx] = fill_value # Applica il background nero
 
         probs_abl = torch.softmax(wrapper(images_abl), dim=1)
         conf_abl = probs_abl[torch.arange(len(pred_labels)), pred_labels]
@@ -123,7 +126,7 @@ def main():
         with torch.no_grad():
             preds = model(x)[0].argmax(1)
 
-        baseline = torch.zeros_like(x)
+        baseline = torch.full_like(x, -0.8102) #partiamo da tutto nero
         t0 = time.perf_counter()
         attrs = ig.attribute(x, baselines=baseline, target=preds, n_steps=args.n_steps)
         t_total += time.perf_counter() - t0

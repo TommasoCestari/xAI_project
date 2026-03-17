@@ -1,0 +1,12 @@
+{
+  "method": "IntegratedGradients",
+  "config": "configs/fashion_mnist_lambda1e-2_c5_seed29.json",
+  "exp_name": "fashion_mnist_lambda1e-2_c5_seed29",
+  "n_steps": 50,
+  "n_samples": 10000,
+  "total_time_s": 11.202,
+  "time_per_sample_s": 0.00112,
+  "mean_confidence_drop": 0.541365,
+  "std_confidence_drop": 0.276662,
+  "device": "cuda:0"
+}
